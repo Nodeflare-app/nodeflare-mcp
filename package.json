@@ -1,0 +1,49 @@
+{
+  "name": "nodeflare-mcp",
+  "version": "0.1.1",
+  "description": "MCP server for NodeFlare RPC \u2014 blockchain data on 23 EVM chains for AI agents. Free public tier, API key, or pay-per-call with x402 (USDC on Base/Polygon/Arbitrum).",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nodeflare-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "mcpName": "io.github.BabyScope/nodeflare",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BabyScope/nodeflare-mcp.git"
+  },
+  "homepage": "https://nodeflare.app/agents",
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "rpc",
+    "ethereum",
+    "evm",
+    "blockchain",
+    "x402",
+    "json-rpc",
+    "web3"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@x402/evm": "2.17.0",
+    "@x402/fetch": "2.17.0",
+    "viem": "^2.48.11",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^22.13.4"
+  },
+  "bugs": {
+    "url": "https://github.com/BabyScope/nodeflare-mcp/issues"
+  }
+}

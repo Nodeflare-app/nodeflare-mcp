@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.BabyScope/nodeflare",
+  "description": "Blockchain JSON-RPC on 23 EVM chains for AI agents - free tier, API key, or x402 pay-per-call.",
+  "repository": {
+    "url": "https://github.com/BabyScope/nodeflare-mcp",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "nodeflare-mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "NODEFLARE_API_KEY",
+          "description": "Optional NodeFlare API key (free at nodeflare.app) \u2014 unlocks heavy methods and higher limits",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "X402_PRIVATE_KEY",
+          "description": "Optional EVM private key of a wallet holding USDC on Base/Polygon/Arbitrum \u2014 heavy methods are paid per call (~$0.001) via x402",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
