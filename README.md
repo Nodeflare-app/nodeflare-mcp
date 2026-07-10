@@ -1,5 +1,8 @@
 # NodeFlare MCP Server
 
+[![nodeflare-mcp MCP server](https://glama.ai/mcp/servers/BabyScope/nodeflare-mcp/badges/card.svg)](https://glama.ai/mcp/servers/BabyScope/nodeflare-mcp)
+
+
 Blockchain JSON-RPC for AI agents on **23 EVM chains** — Ethereum, Base, BNB Chain, Arbitrum, Optimism, Avalanche, HyperEVM, Polygon, and young chains like Robinhood Chain, Plasma, Ink, Zircuit, BOB and Soneium. Served from [NodeFlare](https://nodeflare.app)'s own bare-metal nodes across 5 regions.
 
 ## Quick start
