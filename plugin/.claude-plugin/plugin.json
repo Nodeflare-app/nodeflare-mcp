@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "nodeflare",
+  "displayName": "NodeFlare RPC",
+  "description": "Read on-chain data across 23 EVM chains via NodeFlare's public RPC gateway — balances, tokens, transactions, logs and gas.",
+  "version": "0.3.0",
+  "author": {
+    "name": "NodeFlare",
+    "email": "info@nodeflare.app",
+    "url": "https://nodeflare.app"
+  },
+  "homepage": "https://nodeflare.app/agents",
+  "repository": "https://github.com/Nodeflare-app/nodeflare-mcp",
+  "license": "MIT",
+  "keywords": ["rpc", "ethereum", "evm", "blockchain", "web3", "erc20"],
+  "mcpServers": "./.mcp.json",
+  "commands": ["./commands/"]
+}

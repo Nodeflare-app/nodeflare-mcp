@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "nodeflare": {
+      "command": "npx",
+      "args": ["-y", "nodeflare-mcp@latest"],
+      "env": {
+        "NODEFLARE_API_KEY": "${NODEFLARE_API_KEY}"
+      }
+    }
+  }
+}
