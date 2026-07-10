@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "nodeflare",
+  "version": "0.3.0",
+  "description": "NodeFlare RPC tools for Claude Code — read on-chain data across 23 EVM chains from a free public gateway.",
+  "owner": {
+    "name": "NodeFlare",
+    "email": "info@nodeflare.app",
+    "url": "https://nodeflare.app"
+  },
+  "plugins": [
+    {
+      "name": "nodeflare",
+      "displayName": "NodeFlare RPC",
+      "description": "Read on-chain data across 23 EVM chains via NodeFlare's public RPC gateway — balances, tokens, transactions, logs and gas. Bundles the nodeflare MCP server plus ready-made slash-command recipes.",
+      "version": "0.3.0",
+      "author": {
+        "name": "NodeFlare",
+        "email": "info@nodeflare.app",
+        "url": "https://nodeflare.app"
+      },
+      "source": "./plugin",
+      "category": "development",
+      "homepage": "https://nodeflare.app/agents",
+      "tags": ["rpc", "ethereum", "evm", "blockchain", "web3", "mcp"],
+      "keywords": ["rpc", "ethereum", "base", "arbitrum", "optimism", "erc20", "onchain"]
+    }
+  ]
+}

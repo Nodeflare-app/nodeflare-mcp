@@ -20,6 +20,30 @@ Blockchain JSON-RPC for AI agents on **23 EVM chains** — Ethereum, Base, BNB C
 
 That's it — no API key required for standard reads (block numbers, balances, transactions, `eth_call`).
 
+## Install as a Claude Code plugin
+
+This repo doubles as a [Claude Code](https://claude.com/claude-code) plugin marketplace. Installing the plugin wires up the MCP server **and** a set of slash-command recipes in one step:
+
+```bash
+claude plugin marketplace add Nodeflare-app/nodeflare-mcp
+claude plugin install nodeflare
+```
+
+Then use the recipes below (`/nodeflare:balance`, `/nodeflare:token`, …). To unlock heavy methods, export `NODEFLARE_API_KEY` in your shell before starting Claude Code ([free key, 3M CU/month](https://nodeflare.app)).
+
+## Recipes
+
+Ready-made slash commands bundled with the plugin:
+
+| Recipe | What it does |
+|---|---|
+| `/nodeflare:chains [filter]` | List supported chains, IDs and endpoint URLs |
+| `/nodeflare:balance <address> [chain] [token…]` | Native + ERC-20 balances, one chain or across the majors |
+| `/nodeflare:token <token> [chain] [holder]` | ERC-20 metadata (name/symbol/decimals/supply) + optional holder balance |
+| `/nodeflare:tx <hash> [chain]` | Fetch a transaction + receipt and explain what it did |
+| `/nodeflare:logs <contract> [chain] [from] [to]` | Fetch and summarise a contract's recent event logs |
+| `/nodeflare:gas [chain \| compare]` | Current gas price on a chain, or a cheapest-first comparison |
+
 ## Access tiers
 
 The server picks its access tier from the environment:
