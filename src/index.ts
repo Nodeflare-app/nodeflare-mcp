@@ -8,7 +8,17 @@
 //                           USDC (Base / Polygon / Arbitrum) from this wallet
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { encodeFunctionData, decodeFunctionResult, formatUnits } from "viem";
 import { z } from "zod";
+
+// Minimal ERC-20 ABI for token tools (encode calldata / decode results with viem).
+const ERC20_ABI = [
+  { name: "balanceOf", type: "function", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },
+  { name: "decimals",  type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
+  { name: "symbol",    type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { name: "name",      type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { name: "totalSupply", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
 
 const GATEWAY = "https://rpc.nodeflare.app";
 
@@ -118,7 +128,40 @@ function asText(result: RpcResult) {
   };
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.1.0" });
+function asJson(obj: unknown, isError = false) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }], isError };
+}
+
+// Extract the JSON-RPC `result` from an rpc() call, or null on any error.
+async function callResult(chain: string, method: string, params: unknown[]): Promise<string | null> {
+  const r = await rpc(chain, method, params);
+  const body = r.body as { result?: unknown } | null;
+  if (!r.ok || !body || typeof body.result !== "string") return null;
+  return body.result;
+}
+
+// Batch several eth_calls into ONE JSON-RPC request. A batch counts as a single
+// rate-limit token, so token-metadata reads (balanceOf + decimals + symbol)
+// don't trip the per-IP public limit the way 3 concurrent calls would.
+async function ethCallBatch(chain: string, calls: { to: string; data: string }[]): Promise<(string | null)[]> {
+  if (!CHAINS[chain]) return calls.map(() => null);
+  const batch = calls.map((c, i) => ({ jsonrpc: "2.0", id: i, method: "eth_call", params: [c, "latest"] }));
+  const url = API_KEY ? `${GATEWAY}/${chain}/v1/${API_KEY}` : `${GATEWAY}/${chain}/public`;
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(batch) });
+    const arr = await res.json().catch(() => null) as Array<{ id: number; result?: unknown; error?: unknown }> | null;
+    if (!Array.isArray(arr)) return calls.map(() => null);
+    const byId = new Map(arr.map((r) => [r.id, r]));
+    return calls.map((_, i) => {
+      const r = byId.get(i);
+      return r && !r.error && typeof r.result === "string" ? r.result : null;
+    });
+  } catch {
+    return calls.map(() => null);
+  }
+}
+
+const server = new McpServer({ name: "nodeflare", version: "0.2.0" });
 
 const chainParam = z.enum(Object.keys(CHAINS) as [string, ...string[]]).describe("Chain slug, e.g. 'eth', 'base', 'robinhood'");
 
@@ -196,6 +239,82 @@ server.tool(
     params: z.array(z.unknown()).optional().describe("JSON-RPC params array"),
   },
   async ({ chain, method, params }) => asText(await rpc(chain, method, params ?? [])),
+);
+
+server.tool(
+  "get_transaction",
+  "Get a transaction by its hash (from, to, value, input, block, gas).",
+  { chain: chainParam, hash: z.string().describe("0x-transaction hash") },
+  async ({ chain, hash }) => asText(await rpc(chain, "eth_getTransactionByHash", [hash])),
+);
+
+server.tool(
+  "get_block",
+  "Get a block by number or tag (e.g. 'latest', 'finalized', or a hex number). Set fullTransactions to include full tx objects instead of hashes.",
+  {
+    chain: chainParam,
+    block: z.string().default("latest").describe("Hex block number or tag ('latest', 'finalized', 'safe', 'earliest')"),
+    fullTransactions: z.boolean().default(false).describe("Include full transaction objects"),
+  },
+  async ({ chain, block, fullTransactions }) => asText(await rpc(chain, "eth_getBlockByNumber", [block, fullTransactions])),
+);
+
+server.tool(
+  "get_gas_price",
+  "Get current gas pricing on a chain: base gas price and the suggested priority fee (EIP-1559), both in wei (hex).",
+  { chain: chainParam },
+  async ({ chain }) => {
+    const [gas, prio] = await Promise.all([
+      callResult(chain, "eth_gasPrice", []),
+      callResult(chain, "eth_maxPriorityFeePerGas", []).catch(() => null),
+    ]);
+    if (gas === null) return asJson({ error: "Could not fetch gas price" }, true);
+    return asJson({
+      chain, gasPriceWei: gas, gasPriceGwei: formatUnits(BigInt(gas), 9),
+      maxPriorityFeePerGasWei: prio ?? null,
+    });
+  },
+);
+
+server.tool(
+  "get_token_balance",
+  "Get an ERC-20 token balance for an address, returned both raw and human-readable (uses the token's decimals and symbol).",
+  {
+    chain: chainParam,
+    token: z.string().describe("ERC-20 contract address"),
+    address: z.string().describe("Holder address to check"),
+  },
+  async ({ chain, token, address }) => {
+    const [balHex, decHex, symHex] = await ethCallBatch(chain, [
+      { to: token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: "balanceOf", args: [address as `0x${string}`] }) },
+      { to: token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: "decimals" }) },
+      { to: token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: "symbol" }) },
+    ]);
+    if (balHex === null) return asJson({ error: "Could not read token balance — check the token address and chain" }, true);
+    const raw = decodeFunctionResult({ abi: ERC20_ABI, functionName: "balanceOf", data: balHex as `0x${string}` }) as bigint;
+    const decimals = decHex ? Number(decodeFunctionResult({ abi: ERC20_ABI, functionName: "decimals", data: decHex as `0x${string}` })) : 18;
+    let symbol = "";
+    try { symbol = symHex ? String(decodeFunctionResult({ abi: ERC20_ABI, functionName: "symbol", data: symHex as `0x${string}` })) : ""; } catch { /* non-standard token */ }
+    return asJson({ chain, token, address, symbol, decimals, raw: raw.toString(), balance: formatUnits(raw, decimals) });
+  },
+);
+
+server.tool(
+  "get_token_metadata",
+  "Get ERC-20 token metadata: name, symbol, decimals and total supply (raw + human-readable).",
+  { chain: chainParam, token: z.string().describe("ERC-20 contract address") },
+  async ({ chain, token }) => {
+    const [nameHex, symHex, decHex, supHex] = await ethCallBatch(chain,
+      (["name", "symbol", "decimals", "totalSupply"] as const).map((fn) => ({ to: token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: fn }) })),
+    );
+    if (decHex === null && supHex === null) return asJson({ error: "Not an ERC-20 token, or unreachable — check the address and chain" }, true);
+    const dec = (h: string | null, fn: "decimals") => { try { return h ? Number(decodeFunctionResult({ abi: ERC20_ABI, functionName: fn, data: h as `0x${string}` })) : null; } catch { return null; } };
+    const str = (h: string | null, fn: "name" | "symbol") => { try { return h ? String(decodeFunctionResult({ abi: ERC20_ABI, functionName: fn, data: h as `0x${string}` })) : null; } catch { return null; } };
+    const decimals = dec(decHex, "decimals");
+    let totalSupply: string | null = null, totalSupplyRaw: string | null = null;
+    if (supHex) { try { const t = decodeFunctionResult({ abi: ERC20_ABI, functionName: "totalSupply", data: supHex as `0x${string}` }) as bigint; totalSupplyRaw = t.toString(); totalSupply = formatUnits(t, decimals ?? 18); } catch { /* ignore */ } }
+    return asJson({ chain, token, name: str(nameHex, "name"), symbol: str(symHex, "symbol"), decimals, totalSupplyRaw, totalSupply });
+  },
 );
 
 const transport = new StdioServerTransport();

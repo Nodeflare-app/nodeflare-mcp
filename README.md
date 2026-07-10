@@ -57,6 +57,11 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | `eth_call` | Read-only contract call |
 | `get_logs` | Contract event logs (heavy — key or x402 wallet) |
 | `rpc_call` | Any JSON-RPC method on any supported chain |
+| `get_transaction` | Transaction by hash (from, to, value, input) |
+| `get_block` | Block by number/tag, optional full transactions |
+| `get_gas_price` | Current gas price + EIP-1559 priority fee |
+| `get_token_balance` | ERC-20 balance, raw + human-readable |
+| `get_token_metadata` | ERC-20 name, symbol, decimals, total supply |
 
 ## Links
 
