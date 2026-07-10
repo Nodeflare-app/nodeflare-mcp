@@ -1,6 +1,6 @@
 {
   "name": "nodeflare-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for NodeFlare RPC \u2014 blockchain data on 23 EVM chains for AI agents. Free public tier, API key, or pay-per-call with x402 (USDC on Base/Polygon/Arbitrum).",
   "license": "MIT",
   "type": "module",
@@ -11,7 +11,7 @@
     "dist",
     "README.md"
   ],
-  "mcpName": "io.github.Nodeflare-app/nodeflare",
+  "mcpName": "io.github.Nodeflare-app/nodeflare-mcp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Nodeflare-app/nodeflare-mcp.git"
