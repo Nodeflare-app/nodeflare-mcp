@@ -11,10 +11,10 @@
     "dist",
     "README.md"
   ],
-  "mcpName": "io.github.BabyScope/nodeflare-mcp",
+  "mcpName": "io.github.Nodeflare-app/nodeflare-mcp",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/BabyScope/nodeflare-mcp.git"
+    "url": "git+https://github.com/Nodeflare-app/nodeflare-mcp.git"
   },
   "homepage": "https://nodeflare.app/agents",
   "keywords": [
@@ -44,6 +44,6 @@
     "@types/node": "^22.13.4"
   },
   "bugs": {
-    "url": "https://github.com/BabyScope/nodeflare-mcp/issues"
+    "url": "https://github.com/Nodeflare-app/nodeflare-mcp/issues"
   }
 }

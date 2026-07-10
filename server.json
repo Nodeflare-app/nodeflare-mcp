@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-  "name": "io.github.BabyScope/nodeflare-mcp",
+  "name": "io.github.Nodeflare-app/nodeflare-mcp",
   "description": "Blockchain JSON-RPC on 23 EVM chains for AI agents - free tier, API key, or x402 pay-per-call.",
   "repository": {
-    "url": "https://github.com/BabyScope/nodeflare-mcp",
+    "url": "https://github.com/Nodeflare-app/nodeflare-mcp",
     "source": "github"
   },
   "version": "0.2.0",
