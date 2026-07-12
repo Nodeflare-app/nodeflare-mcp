@@ -23,31 +23,60 @@ const ERC20_ABI = [
 const GATEWAY = "https://rpc.nodeflare.app";
 
 // Mirrors https://x402.nodeflare.app/ — kept static so the server works offline-first.
-const CHAINS: Record<string, { label: string; chainId: number }> = {
-  eth: { label: "Ethereum", chainId: 1 },
-  base: { label: "Base", chainId: 8453 },
-  bnb: { label: "BNB Chain", chainId: 56 },
-  arb: { label: "Arbitrum One", chainId: 42161 },
-  op: { label: "Optimism", chainId: 10 },
-  hl: { label: "HyperEVM (HyperLiquid)", chainId: 999 },
-  avax: { label: "Avalanche C-Chain", chainId: 43114 },
-  unichain: { label: "Unichain", chainId: 130 },
-  sonic: { label: "Sonic", chainId: 146 },
-  polygon: { label: "Polygon PoS", chainId: 137 },
-  linea: { label: "Linea", chainId: 59144 },
-  mantle: { label: "Mantle", chainId: 5000 },
-  zircuit: { label: "Zircuit", chainId: 48900 },
-  robinhood: { label: "Robinhood Chain", chainId: 4663 },
-  xlayer: { label: "XLayer", chainId: 196 },
-  soneium: { label: "Soneium", chainId: 1868 },
-  nova: { label: "Arbitrum Nova", chainId: 42170 },
-  bob: { label: "BOB", chainId: 60808 },
-  ink: { label: "Ink", chainId: 57073 },
-  cronos: { label: "Cronos", chainId: 25 },
-  mode: { label: "Mode", chainId: 34443 },
-  sei: { label: "Sei", chainId: 1329 },
-  plasma: { label: "Plasma", chainId: 9745 },
+const CHAINS: Record<string, { label: string; chainId: number; currency: string }> = {
+  eth: { label: "Ethereum", chainId: 1, currency: "ETH" },
+  base: { label: "Base", chainId: 8453, currency: "ETH" },
+  bnb: { label: "BNB Chain", chainId: 56, currency: "BNB" },
+  arb: { label: "Arbitrum One", chainId: 42161, currency: "ETH" },
+  op: { label: "Optimism", chainId: 10, currency: "ETH" },
+  hl: { label: "HyperEVM (HyperLiquid)", chainId: 999, currency: "HYPE" },
+  avax: { label: "Avalanche C-Chain", chainId: 43114, currency: "AVAX" },
+  unichain: { label: "Unichain", chainId: 130, currency: "ETH" },
+  sonic: { label: "Sonic", chainId: 146, currency: "S" },
+  polygon: { label: "Polygon PoS", chainId: 137, currency: "POL" },
+  linea: { label: "Linea", chainId: 59144, currency: "ETH" },
+  mantle: { label: "Mantle", chainId: 5000, currency: "MNT" },
+  zircuit: { label: "Zircuit", chainId: 48900, currency: "ETH" },
+  robinhood: { label: "Robinhood Chain", chainId: 4663, currency: "ETH" },
+  xlayer: { label: "XLayer", chainId: 196, currency: "OKB" },
+  soneium: { label: "Soneium", chainId: 1868, currency: "ETH" },
+  nova: { label: "Arbitrum Nova", chainId: 42170, currency: "ETH" },
+  bob: { label: "BOB", chainId: 60808, currency: "ETH" },
+  ink: { label: "Ink", chainId: 57073, currency: "ETH" },
+  cronos: { label: "Cronos", chainId: 25, currency: "CRO" },
+  mode: { label: "Mode", chainId: 34443, currency: "ETH" },
+  sei: { label: "Sei", chainId: 1329, currency: "SEI" },
+  plasma: { label: "Plasma", chainId: 9745, currency: "XPL" },
 };
+
+// Common alternate names agents/humans use → canonical slug. The slug itself and
+// the numeric chain ID are always accepted too (handled in resolveChain).
+const ALIASES: Record<string, string> = {
+  ethereum: "eth", mainnet: "eth", "eth-mainnet": "eth",
+  arbitrum: "arb", "arbitrum-one": "arb", arbitrumone: "arb",
+  "arbitrum-nova": "nova", arbitrumnova: "nova",
+  optimism: "op", "op-mainnet": "op",
+  bsc: "bnb", binance: "bnb", "bnb-chain": "bnb", "binance-smart-chain": "bnb",
+  avalanche: "avax", "avalanche-c-chain": "avax",
+  matic: "polygon", "polygon-pos": "polygon", pol: "polygon",
+  hyperevm: "hl", hyperliquid: "hl", hype: "hl",
+  "x-layer": "xlayer", okx: "xlayer",
+};
+
+// Accept a chain slug, a common name/alias, or a numeric chain ID and return the
+// canonical slug (or null if unknown). Removes the "ethereum vs eth vs 1" friction.
+const BY_CHAIN_ID: Record<number, string> = Object.fromEntries(
+  Object.entries(CHAINS).map(([slug, c]) => [c.chainId, slug]),
+);
+function resolveChain(input: string): string | null {
+  const s = String(input).trim().toLowerCase();
+  if (CHAINS[s]) return s;
+  if (ALIASES[s]) return ALIASES[s];
+  // numeric or hex chain ID
+  const n = s.startsWith("0x") ? parseInt(s, 16) : /^\d+$/.test(s) ? parseInt(s, 10) : NaN;
+  if (!Number.isNaN(n) && BY_CHAIN_ID[n]) return BY_CHAIN_ID[n];
+  return null;
+}
 
 const API_KEY = process.env.NODEFLARE_API_KEY;
 const X402_PK = process.env.X402_PRIVATE_KEY;
@@ -78,9 +107,10 @@ interface RpcResult {
   paid?: string; // settlement tx hash when the call was paid via x402
 }
 
-async function rpc(chain: string, method: string, params: unknown[]): Promise<RpcResult> {
-  if (!CHAINS[chain]) {
-    return { ok: false, status: 400, body: { error: `Unknown chain '${chain}'. Use list_chains for valid slugs.` } };
+async function rpc(chainInput: string, method: string, params: unknown[]): Promise<RpcResult> {
+  const chain = resolveChain(chainInput);
+  if (!chain) {
+    return { ok: false, status: 400, body: { error: `Unknown chain '${chainInput}'. Pass a slug, name, or chain ID — see list_chains for valid values.` } };
   }
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
   const init = { method: "POST", headers: { "Content-Type": "application/json" }, body } as const;
@@ -143,8 +173,9 @@ async function callResult(chain: string, method: string, params: unknown[]): Pro
 // Batch several eth_calls into ONE JSON-RPC request. A batch counts as a single
 // rate-limit token, so token-metadata reads (balanceOf + decimals + symbol)
 // don't trip the per-IP public limit the way 3 concurrent calls would.
-async function ethCallBatch(chain: string, calls: { to: string; data: string }[]): Promise<(string | null)[]> {
-  if (!CHAINS[chain]) return calls.map(() => null);
+async function ethCallBatch(chainInput: string, calls: { to: string; data: string }[]): Promise<(string | null)[]> {
+  const chain = resolveChain(chainInput);
+  if (!chain) return calls.map(() => null);
   const batch = calls.map((c, i) => ({ jsonrpc: "2.0", id: i, method: "eth_call", params: [c, "latest"] }));
   const url = API_KEY ? `${GATEWAY}/${chain}/v1/${API_KEY}` : `${GATEWAY}/${chain}/public`;
   try {
@@ -161,9 +192,11 @@ async function ethCallBatch(chain: string, calls: { to: string; data: string }[]
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.2.0" });
+const server = new McpServer({ name: "nodeflare", version: "0.3.0" });
 
-const chainParam = z.enum(Object.keys(CHAINS) as [string, ...string[]]).describe("Chain slug, e.g. 'eth', 'base', 'robinhood'");
+const chainParam = z.string().describe(
+  "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
+);
 
 server.tool(
   "list_chains",
@@ -184,16 +217,28 @@ server.tool(
 
 server.tool(
   "get_block_number",
-  "Get the latest block number on a chain.",
+  "Get the latest block number on a chain (decimal and hex).",
   { chain: chainParam },
-  async ({ chain }) => asText(await rpc(chain, "eth_blockNumber", [])),
+  async ({ chain }) => {
+    const r = await rpc(chain, "eth_blockNumber", []);
+    const hex = (r.body as { result?: string } | null)?.result;
+    if (!r.ok || typeof hex !== "string") return asText(r);
+    return asJson({ chain: resolveChain(chain) ?? chain, blockNumber: parseInt(hex, 16), hex });
+  },
 );
 
 server.tool(
   "get_balance",
-  "Get the native-token balance of an address (in wei, hex).",
+  "Get the native-token balance of an address — raw wei plus a human-readable amount in the chain's native currency.",
   { chain: chainParam, address: z.string().describe("0x-address") },
-  async ({ chain, address }) => asText(await rpc(chain, "eth_getBalance", [address, "latest"])),
+  async ({ chain, address }) => {
+    const r = await rpc(chain, "eth_getBalance", [address, "latest"]);
+    const hex = (r.body as { result?: string } | null)?.result;
+    if (!r.ok || typeof hex !== "string") return asText(r);
+    const slug = resolveChain(chain) ?? chain;
+    const wei = BigInt(hex);
+    return asJson({ chain: slug, address, currency: CHAINS[slug]?.currency ?? "native", balance: formatUnits(wei, 18), wei: wei.toString() });
+  },
 );
 
 server.tool(
@@ -270,7 +315,7 @@ server.tool(
     ]);
     if (gas === null) return asJson({ error: "Could not fetch gas price" }, true);
     return asJson({
-      chain, gasPriceWei: gas, gasPriceGwei: formatUnits(BigInt(gas), 9),
+      chain: resolveChain(chain) ?? chain, gasPriceWei: gas, gasPriceGwei: formatUnits(BigInt(gas), 9),
       maxPriorityFeePerGasWei: prio ?? null,
     });
   },
@@ -295,7 +340,7 @@ server.tool(
     const decimals = decHex ? Number(decodeFunctionResult({ abi: ERC20_ABI, functionName: "decimals", data: decHex as `0x${string}` })) : 18;
     let symbol = "";
     try { symbol = symHex ? String(decodeFunctionResult({ abi: ERC20_ABI, functionName: "symbol", data: symHex as `0x${string}` })) : ""; } catch { /* non-standard token */ }
-    return asJson({ chain, token, address, symbol, decimals, raw: raw.toString(), balance: formatUnits(raw, decimals) });
+    return asJson({ chain: resolveChain(chain) ?? chain, token, address, symbol, decimals, raw: raw.toString(), balance: formatUnits(raw, decimals) });
   },
 );
 
@@ -313,7 +358,7 @@ server.tool(
     const decimals = dec(decHex, "decimals");
     let totalSupply: string | null = null, totalSupplyRaw: string | null = null;
     if (supHex) { try { const t = decodeFunctionResult({ abi: ERC20_ABI, functionName: "totalSupply", data: supHex as `0x${string}` }) as bigint; totalSupplyRaw = t.toString(); totalSupply = formatUnits(t, decimals ?? 18); } catch { /* ignore */ } }
-    return asJson({ chain, token, name: str(nameHex, "name"), symbol: str(symHex, "symbol"), decimals, totalSupplyRaw, totalSupply });
+    return asJson({ chain: resolveChain(chain) ?? chain, token, name: str(nameHex, "name"), symbol: str(symHex, "symbol"), decimals, totalSupplyRaw, totalSupply });
   },
 );
 

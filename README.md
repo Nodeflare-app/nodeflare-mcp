@@ -20,6 +20,8 @@ Blockchain JSON-RPC for AI agents on **23 EVM chains** — Ethereum, Base, BNB C
 
 That's it — no API key required for standard reads (block numbers, balances, transactions, `eth_call`).
 
+Every tool's `chain` argument accepts a **slug** (`eth`, `base`, `arb`), a **name** (`ethereum`, `arbitrum`, `bsc`), or a **numeric chain ID** (`1`, `8453`) — so agents don't have to know NodeFlare's internal slugs.
+
 ## Install as a Claude Code plugin
 
 This repo doubles as a [Claude Code](https://claude.com/claude-code) plugin marketplace. Installing the plugin wires up the MCP server **and** a set of slash-command recipes in one step:
@@ -75,8 +77,8 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | Tool | Description |
 |---|---|
 | `list_chains` | The 23 supported chains with chain IDs and endpoints |
-| `get_block_number` | Latest block number |
-| `get_balance` | Native-token balance of an address |
+| `get_block_number` | Latest block number (decimal + hex) |
+| `get_balance` | Native-token balance — raw wei + human-readable amount in the chain's currency |
 | `get_transaction_receipt` | Transaction receipt by hash |
 | `eth_call` | Read-only contract call |
 | `get_logs` | Contract event logs (heavy — key or x402 wallet) |
