@@ -8,7 +8,9 @@
 //                           USDC (Base / Polygon / Arbitrum) from this wallet
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { encodeFunctionData, decodeFunctionResult, formatUnits } from "viem";
+import { encodeFunctionData, decodeFunctionResult, formatUnits, createPublicClient, http } from "viem";
+import { mainnet } from "viem/chains";
+import { normalize } from "viem/ens";
 import { z } from "zod";
 
 // Minimal ERC-20 ABI for token tools (encode calldata / decode results with viem).
@@ -98,6 +100,31 @@ function getPayFetch(): Promise<typeof fetch> {
     })();
   }
   return payFetchPromise;
+}
+
+// ENS lives on Ethereum mainnet. Resolve names lazily through our own eth endpoint.
+let ensClient: ReturnType<typeof createPublicClient> | null = null;
+function getEnsClient() {
+  if (!ensClient) {
+    const url = API_KEY ? `${GATEWAY}/eth/v1/${API_KEY}` : `${GATEWAY}/eth/public`;
+    ensClient = createPublicClient({ chain: mainnet, transport: http(url) });
+  }
+  return ensClient;
+}
+
+// Accept a 0x address or an ENS name (e.g. 'vitalik.eth') and return an address.
+// Plain 0x addresses and anything without a dot pass through unchanged so normal
+// JSON-RPC validation still applies downstream.
+async function resolveAddress(input: string): Promise<{ address: string; ens?: string } | { error: string }> {
+  const s = input.trim();
+  if (/^0x[0-9a-fA-F]{40}$/.test(s) || !s.includes(".")) return { address: s };
+  try {
+    const addr = await getEnsClient().getEnsAddress({ name: normalize(s) });
+    if (!addr) return { error: `ENS name '${s}' does not resolve to an address.` };
+    return { address: addr, ens: s };
+  } catch (e) {
+    return { error: `Could not resolve ENS name '${s}': ${(e as Error).message}` };
+  }
 }
 
 interface RpcResult {
@@ -229,15 +256,17 @@ server.tool(
 
 server.tool(
   "get_balance",
-  "Get the native-token balance of an address — raw wei plus a human-readable amount in the chain's native currency.",
-  { chain: chainParam, address: z.string().describe("0x-address") },
+  "Get the native-token balance of an address — raw wei plus a human-readable amount in the chain's native currency. The address may be an ENS name (e.g. 'vitalik.eth').",
+  { chain: chainParam, address: z.string().describe("0x-address or ENS name") },
   async ({ chain, address }) => {
-    const r = await rpc(chain, "eth_getBalance", [address, "latest"]);
+    const ra = await resolveAddress(address);
+    if ("error" in ra) return asJson({ error: ra.error }, true);
+    const r = await rpc(chain, "eth_getBalance", [ra.address, "latest"]);
     const hex = (r.body as { result?: string } | null)?.result;
     if (!r.ok || typeof hex !== "string") return asText(r);
     const slug = resolveChain(chain) ?? chain;
     const wei = BigInt(hex);
-    return asJson({ chain: slug, address, currency: CHAINS[slug]?.currency ?? "native", balance: formatUnits(wei, 18), wei: wei.toString() });
+    return asJson({ chain: slug, address: ra.address, ...(ra.ens ? { ens: ra.ens } : {}), currency: CHAINS[slug]?.currency ?? "native", balance: formatUnits(wei, 18), wei: wei.toString() });
   },
 );
 
@@ -253,12 +282,21 @@ server.tool(
   "Execute a read-only contract call (eth_call) and return the raw result.",
   {
     chain: chainParam,
-    to: z.string().describe("Contract address"),
+    to: z.string().describe("Contract address or ENS name"),
     data: z.string().describe("ABI-encoded calldata (0x…)"),
-    from: z.string().optional().describe("Optional caller address"),
+    from: z.string().optional().describe("Optional caller address or ENS name"),
   },
-  async ({ chain, to, data, from }) =>
-    asText(await rpc(chain, "eth_call", [{ to, data, ...(from ? { from } : {}) }, "latest"])),
+  async ({ chain, to, data, from }) => {
+    const rto = await resolveAddress(to);
+    if ("error" in rto) return asJson({ error: rto.error }, true);
+    let fromAddr: string | undefined;
+    if (from) {
+      const rf = await resolveAddress(from);
+      if ("error" in rf) return asJson({ error: rf.error }, true);
+      fromAddr = rf.address;
+    }
+    return asText(await rpc(chain, "eth_call", [{ to: rto.address, data, ...(fromAddr ? { from: fromAddr } : {}) }, "latest"]));
+  },
 );
 
 server.tool(
@@ -327,9 +365,12 @@ server.tool(
   {
     chain: chainParam,
     token: z.string().describe("ERC-20 contract address"),
-    address: z.string().describe("Holder address to check"),
+    address: z.string().describe("Holder address or ENS name to check"),
   },
   async ({ chain, token, address }) => {
+    const ra = await resolveAddress(address);
+    if ("error" in ra) return asJson({ error: ra.error }, true);
+    address = ra.address;
     const [balHex, decHex, symHex] = await ethCallBatch(chain, [
       { to: token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: "balanceOf", args: [address as `0x${string}`] }) },
       { to: token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: "decimals" }) },
@@ -340,7 +381,7 @@ server.tool(
     const decimals = decHex ? Number(decodeFunctionResult({ abi: ERC20_ABI, functionName: "decimals", data: decHex as `0x${string}` })) : 18;
     let symbol = "";
     try { symbol = symHex ? String(decodeFunctionResult({ abi: ERC20_ABI, functionName: "symbol", data: symHex as `0x${string}` })) : ""; } catch { /* non-standard token */ }
-    return asJson({ chain: resolveChain(chain) ?? chain, token, address, symbol, decimals, raw: raw.toString(), balance: formatUnits(raw, decimals) });
+    return asJson({ chain: resolveChain(chain) ?? chain, token, address, ...(ra.ens ? { ens: ra.ens } : {}), symbol, decimals, raw: raw.toString(), balance: formatUnits(raw, decimals) });
   },
 );
 
@@ -360,6 +401,99 @@ server.tool(
     if (supHex) { try { const t = decodeFunctionResult({ abi: ERC20_ABI, functionName: "totalSupply", data: supHex as `0x${string}` }) as bigint; totalSupplyRaw = t.toString(); totalSupply = formatUnits(t, decimals ?? 18); } catch { /* ignore */ } }
     return asJson({ chain: resolveChain(chain) ?? chain, token, name: str(nameHex, "name"), symbol: str(symHex, "symbol"), decimals, totalSupplyRaw, totalSupply });
   },
+);
+
+server.tool(
+  "resolve_ens",
+  "Resolve an ENS name to an address (forward), or a 0x-address to its primary ENS name (reverse). ENS is read from Ethereum mainnet.",
+  { name: z.string().describe("An ENS name like 'vitalik.eth' to resolve to an address, or a 0x-address to reverse-resolve to its primary ENS name") },
+  async ({ name }) => {
+    const s = name.trim();
+    try {
+      if (/^0x[0-9a-fA-F]{40}$/.test(s)) {
+        const ens = await getEnsClient().getEnsName({ address: s as `0x${string}` });
+        return asJson({ address: s, name: ens ?? null });
+      }
+      const addr = await getEnsClient().getEnsAddress({ name: normalize(s) });
+      return asJson({ name: s, address: addr ?? null }, !addr);
+    } catch (e) {
+      return asJson({ error: `ENS lookup failed for '${s}': ${(e as Error).message}` }, true);
+    }
+  },
+);
+
+// ── Prompts ──────────────────────────────────────────────────────────────────
+// The same recipes shipped in the Claude Code plugin, exposed as MCP prompts so
+// any MCP client (Cursor, Windsurf, …) gets guided workflows over the tools.
+const promptMsg = (text: string) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text } }] });
+
+server.prompt(
+  "chains",
+  "List the EVM chains NodeFlare serves, with chain IDs and endpoints",
+  { filter: z.string().optional().describe("Optional substring to filter chains by name or slug") },
+  ({ filter }) => promptMsg(
+    `Use the list_chains tool to list the EVM chains NodeFlare serves. Present a compact table of slug, chain ID and public endpoint URL.` +
+    (filter ? ` Filter to chains matching "${filter}" and, for a single match, also show its keyed and x402 endpoints.` : ``),
+  ),
+);
+
+server.prompt(
+  "balance",
+  "Check an address's native + ERC-20 balances on one or more chains",
+  { address: z.string().describe("0x-address or ENS name"), chain: z.string().optional(), tokens: z.string().optional().describe("Comma-separated ERC-20 addresses") },
+  ({ address, chain, tokens }) => promptMsg(
+    `Check on-chain balances for ${address} using the nodeflare tools.\n` +
+    `1. Native balance via get_balance on ${chain ?? "ethereum — or across the majors (ethereum, base, arbitrum, optimism, bnb) if the user wants a cross-chain view"}.\n` +
+    (tokens ? `2. ERC-20 balances via get_token_balance for: ${tokens}.\n` : `2. If the user names any ERC-20 tokens, use get_token_balance for each.\n`) +
+    `Report each balance with its chain and symbol.`,
+  ),
+);
+
+server.prompt(
+  "token",
+  "Look up an ERC-20 token's metadata and optionally a holder's balance",
+  { token: z.string().describe("ERC-20 contract address"), chain: z.string().optional(), holder: z.string().optional().describe("0x-address or ENS name") },
+  ({ token, chain, holder }) => promptMsg(
+    `Inspect the ERC-20 token ${token}${chain ? ` on ${chain}` : ` on ethereum (unless the user says otherwise)`} using the nodeflare tools.\n` +
+    `1. get_token_metadata for name, symbol, decimals and total supply.\n` +
+    (holder ? `2. get_token_balance for the holder ${holder}.\n` : ``) +
+    `Summarise the result and flag anything unusual (reverts on symbol(), zero supply, etc.).`,
+  ),
+);
+
+server.prompt(
+  "tx",
+  "Fetch a transaction and its receipt and explain what it did",
+  { hash: z.string().describe("0x-transaction hash"), chain: z.string().optional() },
+  ({ hash, chain }) => promptMsg(
+    `Explain transaction ${hash}${chain ? ` on ${chain}` : ` (default ethereum; if not found, suggest another chain)`} using the nodeflare tools.\n` +
+    `1. get_transaction for the tx and get_transaction_receipt for status, gas used and logs.\n` +
+    `2. Explain in plain language: success or revert, who sent it, what contract it hit, value/gas, and what the emitted events (decode well-known signatures like ERC-20 Transfer/Approval, swaps) suggest happened.`,
+  ),
+);
+
+server.prompt(
+  "logs",
+  "Fetch and summarize recent event logs for a contract",
+  { contract: z.string().describe("Contract address"), chain: z.string().optional(), fromBlock: z.string().optional(), toBlock: z.string().optional() },
+  ({ contract, chain, fromBlock, toBlock }) => promptMsg(
+    `Fetch and summarise event logs for ${contract}${chain ? ` on ${chain}` : ` on ethereum`} using the nodeflare tools.\n` +
+    (fromBlock || toBlock
+      ? `Query block range ${fromBlock ?? "earliest"}..${toBlock ?? "latest"} with get_logs.\n`
+      : `First call get_block_number, then query a recent window (a few thousand blocks) with get_logs so the range stays within limits.\n`) +
+    `Group results by event signature (topic0); decode recognisable ones (ERC-20 Transfer/Approval, swaps) and highlight notable entries. get_logs is a heavy method — remind the user to set NODEFLARE_API_KEY if it reports unavailable on the public tier.`,
+  ),
+);
+
+server.prompt(
+  "gas",
+  "Show current gas price on a chain, or compare across chains",
+  { chain: z.string().optional().describe("A chain, or omit / 'compare' for a cross-chain comparison") },
+  ({ chain }) => promptMsg(
+    chain && chain !== "compare" && chain !== "all"
+      ? `Use get_gas_price for ${chain} and report the base gas price and priority fee in gwei.`
+      : `Use get_gas_price across the major chains (ethereum, base, arbitrum, optimism, bnb, polygon) and present a table ranked cheapest-first in gwei, with a one-line takeaway on where a simple transfer is cheapest right now.`,
+  ),
 );
 
 const transport = new StdioServerTransport();

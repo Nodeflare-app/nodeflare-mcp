@@ -88,6 +88,13 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | `get_gas_price` | Current gas price + EIP-1559 priority fee |
 | `get_token_balance` | ERC-20 balance, raw + human-readable |
 | `get_token_metadata` | ERC-20 name, symbol, decimals, total supply |
+| `resolve_ens` | ENS name → address (forward) or address → primary ENS name (reverse) |
+
+Address arguments (`get_balance`, `get_token_balance`, `eth_call`) also accept **ENS names** — pass `vitalik.eth` and it's resolved to an address automatically.
+
+## Prompts (any MCP client)
+
+The server also exposes the recipes as **MCP prompts**, so guided workflows show up in any MCP client (Cursor, Windsurf, …), not just the Claude Code plugin: `chains`, `balance`, `token`, `tx`, `logs`, `gas`.
 
 ## Links
 
