@@ -1,0 +1,22 @@
+# Smithery configuration — https://smithery.ai/docs
+# Lets Smithery discover, configure and run the published npm server over stdio.
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      nodeflareApiKey:
+        type: string
+        title: NodeFlare API Key
+        description: >-
+          Optional. A free API key raises limits and unlocks heavy methods
+          (eth_getLogs, trace, debug). Get one at https://nodeflare.app —
+          without it the server uses the free public tier.
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'nodeflare-mcp'],
+      env: config.nodeflareApiKey ? { NODEFLARE_API_KEY: config.nodeflareApiKey } : {}
+    })
+  exampleConfig: {}
