@@ -1,12 +1,14 @@
 name: Publish to npm
 
 # Trusted Publishing (OIDC) — no npm token. Publishing is authorized by npm
-# because this repo + workflow are configured as a trusted publisher for the
+# because this repo + workflow are a configured trusted publisher for the
 # package. Triggered by pushing a version tag (e.g. v0.3.0).
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
+
+permissions: {} # least privilege by default; the job grants only what it needs
 
 jobs:
   publish:
@@ -15,11 +17,13 @@ jobs:
       contents: read
       id-token: write # required for OIDC / provenance
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
-      - run: npm install -g npm@latest # npm >= 11.5 for trusted publishing
-      - run: npm install
+      - run: npm install -g npm@12.0.1 # pinned; npm >= 11.5 required for trusted publishing
+      - run: npm ci
       - run: npm publish --provenance --access public
