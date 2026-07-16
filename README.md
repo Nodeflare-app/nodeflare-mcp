@@ -89,6 +89,7 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | `get_token_balance` | ERC-20 balance, raw + human-readable |
 | `get_token_metadata` | ERC-20 name, symbol, decimals, total supply |
 | `resolve_ens` | ENS name → address (forward) or address → primary ENS name (reverse) |
+| `get_multichain_balances` | Native + ERC-20 balances for one address across many of the 23 chains in one call (incl. young chains); pay-per-call with an x402 wallet |
 
 Address arguments (`get_balance`, `get_token_balance`, `eth_call`) also accept **ENS names** — pass `vitalik.eth` and it's resolved to an address automatically.
 
