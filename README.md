@@ -93,6 +93,8 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 
 Address arguments (`get_balance`, `get_token_balance`, `eth_call`) also accept **ENS names** — pass `vitalik.eth` and it's resolved to an address automatically.
 
+`get_multichain_balances` can also **auto-discover** the tokens an address holds (`discover: true`, x402 wallet required). Discovered tokens are USD-priced via DefiLlama and, on price-covered chains, filtered by value: pass `minUsd` (default `0.01`) to set the worthless-token cutoff, `includeSpam: true` to keep unpriced tokens, or `includeDust: true` to keep sub-`1e-9` balances.
+
 ## Prompts (any MCP client)
 
 The server also exposes the recipes as **MCP prompts**, so guided workflows show up in any MCP client (Cursor, Windsurf, …), not just the Claude Code plugin: `chains`, `balance`, `token`, `tx`, `logs`, `gas`.

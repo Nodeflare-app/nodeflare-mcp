@@ -219,7 +219,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.5.0" });
+const server = new McpServer({ name: "nodeflare", version: "0.6.0" });
 
 const chainParam = z.string().describe(
   "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
@@ -431,12 +431,24 @@ server.tool(
     tokens: z.record(z.string(), z.array(z.string())).optional().describe("ERC-20 contract addresses per chain, e.g. { base: ['0x833589…'] }"),
     discover: z.boolean().optional().describe("Auto-discover the ERC-20 tokens the address holds via Transfer logs. Needs an x402 wallet (heavy method). Comprehensive on young chains; large chains cap the scan — narrow with fromBlock."),
     fromBlock: z.string().optional().describe("Start block for discovery (hex or 'earliest'); narrow the window on high-history chains"),
+    minUsd: z.number().optional().describe("Discovery only: drop discovered tokens worth less than this USD value on price-covered chains (default 0.01, filters near-worthless spam). Set 0 to keep any priced token."),
+    includeSpam: z.boolean().optional().describe("Discovery only: keep tokens with no DefiLlama price (likely spam/airdrops) on price-covered chains. Default false."),
+    includeDust: z.boolean().optional().describe("Discovery only: keep dust balances below 1e-9 units. Default false."),
   },
-  async ({ address, chains, tokens, discover, fromBlock }) => {
+  async ({ address, chains, tokens, discover, fromBlock, minUsd, includeSpam, includeDust }) => {
     const init = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address, ...(chains ? { chains } : {}), ...(tokens ? { tokens } : {}), ...(discover ? { discover } : {}), ...(fromBlock ? { fromBlock } : {}) }),
+      body: JSON.stringify({
+        address,
+        ...(chains ? { chains } : {}),
+        ...(tokens ? { tokens } : {}),
+        ...(discover ? { discover } : {}),
+        ...(fromBlock ? { fromBlock } : {}),
+        ...(minUsd !== undefined ? { minUsd } : {}),
+        ...(includeSpam ? { includeSpam } : {}),
+        ...(includeDust ? { includeDust } : {}),
+      }),
     } as const;
     try {
       if (X402_PK) {
