@@ -219,7 +219,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.3.0" });
+const server = new McpServer({ name: "nodeflare", version: "0.4.0" });
 
 const chainParam = z.string().describe(
   "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
@@ -418,6 +418,36 @@ server.tool(
       return asJson({ name: s, address: addr ?? null }, !addr);
     } catch (e) {
       return asJson({ error: `ENS lookup failed for '${s}': ${(e as Error).message}` }, true);
+    }
+  },
+);
+
+server.tool(
+  "get_multichain_balances",
+  "Get native + ERC-20 token balances for one address across many of the 23 EVM chains in a SINGLE call — including young chains (Robinhood, Plasma, Ink) that Alchemy/Moralis omit. With an x402 wallet (X402_PRIVATE_KEY) this is paid per request (~$0.0003/chain); otherwise it uses the free public tier.",
+  {
+    address: z.string().describe("0x-address to look up"),
+    chains: z.array(z.string()).optional().describe("Chains to include — slug, name, or chain ID; defaults to all 23"),
+    tokens: z.record(z.string(), z.array(z.string())).optional().describe("ERC-20 contract addresses per chain, e.g. { base: ['0x833589…'] }"),
+  },
+  async ({ address, chains, tokens }) => {
+    const init = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, ...(chains ? { chains } : {}), ...(tokens ? { tokens } : {}) }),
+    } as const;
+    try {
+      if (X402_PK) {
+        const payFetch = await getPayFetch();
+        const res = await payFetch(`${GATEWAY}/data/balances/x402`, init);
+        const json = (await res.json().catch(() => null)) as object | null;
+        const paid = res.headers.get("PAYMENT-RESPONSE") ? { _x402: "settled via x402" } : {};
+        return asJson({ ...(json ?? {}), ...paid }, !res.ok);
+      }
+      const res = await fetch(`${GATEWAY}/data/balances`, init);
+      return asJson(await res.json().catch(() => null), !res.ok);
+    } catch (e) {
+      return asJson({ error: `balances lookup failed: ${(e as Error).message}` }, true);
     }
   },
 );
