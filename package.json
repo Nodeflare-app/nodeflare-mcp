@@ -1,6 +1,7 @@
 {
   "name": "nodeflare-mcp",
   "version": "0.6.0",
+  "author": "NodeFlare <info@nodeflare.app> (https://nodeflare.app)",
   "description": "MCP server for NodeFlare RPC — blockchain data on 23 EVM chains for AI agents. Free public tier, API key, or pay-per-call with x402 (USDC on Base/Polygon/Arbitrum).",
   "license": "MIT",
   "type": "module",
@@ -19,14 +20,23 @@
   "homepage": "https://nodeflare.app/agents",
   "keywords": [
     "mcp",
+    "mcp-server",
+    "model-context-protocol",
     "modelcontextprotocol",
+    "ai-agents",
+    "agent",
+    "claude",
+    "cursor",
     "rpc",
+    "json-rpc",
     "ethereum",
     "evm",
     "blockchain",
+    "web3",
+    "onchain",
     "x402",
-    "json-rpc",
-    "web3"
+    "multichain",
+    "nodeflare"
   ],
   "scripts": {
     "build": "tsc",
