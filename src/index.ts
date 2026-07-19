@@ -23,6 +23,10 @@ const ERC20_ABI = [
 ] as const;
 
 const GATEWAY = "https://rpc.nodeflare.app";
+// Identify our SDK traffic. The gateway edge blocks empty / bare-"node" (undici
+// default) User-Agents on the public tier as bot noise, so we send a distinct UA
+// to stay allowed on keyless calls.
+const UA = "nodeflare-mcp/0.6.2";
 
 // Mirrors https://x402.nodeflare.app/ — kept static so the server works offline-first.
 const CHAINS: Record<string, { label: string; chainId: number; currency: string }> = {
@@ -107,7 +111,7 @@ let ensClient: ReturnType<typeof createPublicClient> | null = null;
 function getEnsClient() {
   if (!ensClient) {
     const url = API_KEY ? `${GATEWAY}/eth/v1/${API_KEY}` : `${GATEWAY}/eth/public`;
-    ensClient = createPublicClient({ chain: mainnet, transport: http(url) });
+    ensClient = createPublicClient({ chain: mainnet, transport: http(url, { fetchOptions: { headers: { "User-Agent": UA } } }) });
   }
   return ensClient;
 }
@@ -140,7 +144,7 @@ async function rpc(chainInput: string, method: string, params: unknown[]): Promi
     return { ok: false, status: 400, body: { error: `Unknown chain '${chainInput}'. Pass a slug, name, or chain ID — see list_chains for valid values.` } };
   }
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
-  const init = { method: "POST", headers: { "Content-Type": "application/json" }, body } as const;
+  const init = { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": UA }, body } as const;
 
   if (API_KEY) {
     const res = await fetch(`${GATEWAY}/${chain}/v1/${API_KEY}`, init);
@@ -206,7 +210,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   const batch = calls.map((c, i) => ({ jsonrpc: "2.0", id: i, method: "eth_call", params: [c, "latest"] }));
   const url = API_KEY ? `${GATEWAY}/${chain}/v1/${API_KEY}` : `${GATEWAY}/${chain}/public`;
   try {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(batch) });
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": UA }, body: JSON.stringify(batch) });
     const arr = await res.json().catch(() => null) as Array<{ id: number; result?: unknown; error?: unknown }> | null;
     if (!Array.isArray(arr)) return calls.map(() => null);
     const byId = new Map(arr.map((r) => [r.id, r]));
@@ -438,7 +442,7 @@ server.tool(
   async ({ address, chains, tokens, discover, fromBlock, minUsd, includeSpam, includeDust }) => {
     const init = {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "User-Agent": UA },
       body: JSON.stringify({
         address,
         ...(chains ? { chains } : {}),
