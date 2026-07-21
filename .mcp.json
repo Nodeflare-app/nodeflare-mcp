@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nodeflare": {
+      "command": "npx",
+      "args": ["-y", "nodeflare-mcp"]
+    }
+  }
+}
