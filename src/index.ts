@@ -172,7 +172,7 @@ async function rpc(chainInput: string, method: string, params: unknown[]): Promi
       body: {
         error: `${method} is not available on the free public tier.`,
         options: [
-          "Set NODEFLARE_API_KEY (free key, 3M compute units/month: https://nodeflare.app)",
+          "Set NODEFLARE_API_KEY (free key, 2M compute units/month: https://nodeflare.app)",
           "Set X402_PRIVATE_KEY (wallet with USDC on Base/Polygon/Arbitrum) to pay ~$0.001 per call via x402",
         ],
       },

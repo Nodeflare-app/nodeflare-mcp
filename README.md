@@ -31,7 +31,7 @@ claude plugin marketplace add Nodeflare-app/nodeflare-mcp
 claude plugin install nodeflare
 ```
 
-Then use the recipes below (`/nodeflare:balance`, `/nodeflare:token`, …). To unlock heavy methods, export `NODEFLARE_API_KEY` in your shell before starting Claude Code ([free key, 3M CU/month](https://nodeflare.app)).
+Then use the recipes below (`/nodeflare:balance`, `/nodeflare:token`, …). To unlock heavy methods, export `NODEFLARE_API_KEY` in your shell before starting Claude Code ([free key, 2M CU/month](https://nodeflare.app)).
 
 ## Recipes
 
@@ -53,7 +53,7 @@ The server picks its access tier from the environment:
 | Env var | Tier |
 |---|---|
 | *(none)* | Free public endpoints — standard read methods, rate-limited per IP |
-| `NODEFLARE_API_KEY` | Free/paid key — heavy methods, 3,000,000 compute units/month free ([get one](https://nodeflare.app)) |
+| `NODEFLARE_API_KEY` | Free/paid key — heavy methods, 2,000,000 compute units/month free ([get one](https://nodeflare.app)) |
 | `X402_PRIVATE_KEY` | **Pay per call with [x402](https://nodeflare.app/x402)** — heavy methods (`eth_getLogs`, `trace_*`, `debug_*`) are paid from this wallet in USDC on Base, Polygon or Arbitrum, ~$0.001/call. No account needed; gas is covered by the facilitator. |
 
 With an x402 wallet, a blocked heavy method is retried automatically as a paid call — the tool result includes `"_x402": "settled via x402"` when a payment settled on-chain.
@@ -101,7 +101,7 @@ The server also exposes the recipes as **MCP prompts**, so guided workflows show
 
 ## Links
 
-- [NodeFlare](https://nodeflare.app) — free API key, 3M CU/month
+- [NodeFlare](https://nodeflare.app) — free API key, 2M CU/month
 - [x402 pay-per-request](https://nodeflare.app/x402) — pricing and how it works
 - [Docs](https://nodeflare.app/docs) · [Status](https://nodeflare.app/status) · [Discord](https://discord.gg/ameHnRy2D6)
 
