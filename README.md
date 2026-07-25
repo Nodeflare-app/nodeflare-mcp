@@ -90,6 +90,11 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | `get_token_metadata` | ERC-20 name, symbol, decimals, total supply |
 | `resolve_ens` | ENS name → address (forward) or address → primary ENS name (reverse) |
 | `get_multichain_balances` | Native + ERC-20 balances for one address across many of the 23 chains in one call (incl. young chains); pay-per-call with an x402 wallet |
+| `get_token_allowances` | ERC-20 approvals a wallet has granted across chains, with revoked ones dropped and unlimited approvals flagged (heavy — key or x402) |
+| `get_wallet_report` | Full "know this wallet" report: balances + USD total + top holdings + active approvals, across chains (approvals half is heavy) |
+| `check_token_safety` | Risk-check an ERC-20 before trading: ownership, proxy detection, holder concentration, honeypot simulation → risk score (deep checks heavy) |
+| `simulate_transaction` | Tx pre-flight: will it revert, gas used, and which tokens/ETH move (asset-change tracing is heavy) |
+| `onchain_answer` | Onchain Answer Engine — plain-English question about a wallet/token → a cited verdict in one call (key or x402; no free tier) |
 
 Address arguments (`get_balance`, `get_token_balance`, `eth_call`) also accept **ENS names** — pass `vitalik.eth` and it's resolved to an address automatically.
 

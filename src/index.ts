@@ -26,7 +26,7 @@ const GATEWAY = "https://rpc.nodeflare.app";
 // Identify our SDK traffic. The gateway edge blocks empty / bare-"node" (undici
 // default) User-Agents on the public tier as bot noise, so we send a distinct UA
 // to stay allowed on keyless calls.
-const UA = "nodeflare-mcp/0.6.4";
+const UA = "nodeflare-mcp/0.7.0";
 
 // Mirrors https://x402.nodeflare.app/ — kept static so the server works offline-first.
 const CHAINS: Record<string, { label: string; chainId: number; currency: string }> = {
@@ -223,7 +223,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.6.4" });
+const server = new McpServer({ name: "nodeflare", version: "0.7.0" });
 
 const chainParam = z.string().describe(
   "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
@@ -466,6 +466,104 @@ server.tool(
       return asJson(await res.json().catch(() => null), !res.ok);
     } catch (e) {
       return asJson({ error: `balances lookup failed: ${(e as Error).message}` }, true);
+    }
+  },
+);
+
+// ── Agent-intelligence tools (the moat) ──────────────────────────────────────
+// These call NodeFlare's composite /data/* + /answer endpoints. Unlike the
+// remote MCP, the local server CAN authenticate, so the heavy path actually
+// runs here: keyed (NODEFLARE_API_KEY → Bearer) or paid (X402_PRIVATE_KEY →
+// x402), falling back to the light public result. Same young-chain coverage
+// (Robinhood, Plasma, Ink, Zircuit) that big indexers leave empty.
+async function callData(name: string, body: Record<string, unknown>) {
+  const init = { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": UA }, body: JSON.stringify(body) } as const;
+  try {
+    if (API_KEY) {
+      const res = await fetch(`${GATEWAY}/data/${name}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${API_KEY}` } });
+      return asJson(await res.json().catch(() => null), !res.ok);
+    }
+    if (X402_PK) {
+      const payFetch = await getPayFetch();
+      const res = await payFetch(`${GATEWAY}/data/${name}/x402`, init);
+      const json = (await res.json().catch(() => null)) as object | null;
+      const paid = res.headers.get("PAYMENT-RESPONSE") ? { _x402: "settled via x402" } : {};
+      return asJson({ ...(json ?? {}), ...paid }, !res.ok);
+    }
+    const res = await fetch(`${GATEWAY}/data/${name}`, init);
+    return asJson(await res.json().catch(() => null), !res.ok);
+  } catch (e) {
+    return asJson({ error: `${name} failed: ${(e as Error).message}` }, true);
+  }
+}
+
+server.tool(
+  "get_token_allowances",
+  "ERC-20 approvals a wallet has granted (what it approved and for how much) across many of the 23 EVM chains in ONE call — including young chains (Robinhood, Plasma, Ink) that revoke.cash-style tools skip. Scans Approval logs, reads the live allowance, drops revoked ones, flags unlimited approvals. Heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY.",
+  {
+    address: z.string().describe("0x owner/approver address to look up"),
+    chains: z.array(z.string()).optional().describe("Chains to include — slug/name/ID; defaults to all 23"),
+  },
+  async ({ address, chains }) => callData("allowances", { address, ...(chains ? { chains } : {}) }),
+);
+
+server.tool(
+  "get_wallet_report",
+  "The full agent-ready 'know this wallet' report in ONE call: native + ERC-20 balances (USD-priced), a rolled-up total + top holdings, AND the active token approvals (revoke risk) across many of the 23 EVM chains — including young chains big indexers skip. The approvals half is heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (balances/USD come back either way).",
+  {
+    address: z.string().describe("0x-address to report on"),
+    chains: z.array(z.string()).optional().describe("Chains to include — slug/name/ID; defaults to all 23"),
+  },
+  async ({ address, chains }) => callData("wallet-report", { address, ...(chains ? { chains } : {}) }),
+);
+
+server.tool(
+  "check_token_safety",
+  "Risk-check an ERC-20 before trading it: metadata, contract + ownership status, upgradeable-proxy detection, holder concentration, and a transfer/honeypot simulation → risk signals + a score. The deep checks (concentration, honeypot) are heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY. Works on young chains (Zircuit, Robinhood, Plasma, Ink) that big indexers leave empty.",
+  {
+    chain: z.string().describe("Chain — slug (eth, base, robinhood…), name, or chain ID"),
+    token: z.string().describe("0x ERC-20 contract address to check"),
+  },
+  async ({ chain, token }) => callData("token-safety", { chain, token }),
+);
+
+server.tool(
+  "simulate_transaction",
+  "Transaction pre-flight on one chain: will this tx revert (and why), how much gas, and which tokens/ETH move? The asset-change tracing is heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (revert/gas come back either way). Built for agents checking a tx before broadcasting.",
+  {
+    chain: z.string().describe("Chain — slug/name/ID"),
+    to: z.string().describe("0x target/contract address"),
+    data: z.string().optional().describe("0x calldata (default 0x)"),
+    from: z.string().optional().describe("Optional 0x sender address"),
+    value: z.string().optional().describe("Hex wei to send (default 0x0)"),
+  },
+  async ({ chain, to, data, from, value }) => callData("simulate", { chain, to, ...(data ? { data } : {}), ...(from ? { from } : {}), ...(value ? { value } : {}) }),
+);
+
+server.tool(
+  "onchain_answer",
+  "Onchain Answer Engine: ask a plain-English question about any wallet or token across the 23 EVM chains and get back a CITED verdict in one call — 'is token 0x… on <chain> a scam?', 'what does wallet 0x… hold?'. NodeFlare plans the on-chain lookups, runs them on its own nodes, and synthesizes a sourced answer. Paid: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (no free anonymous tier — it runs on a GPU).",
+  {
+    question: z.string().describe("Natural-language question about a wallet or token, e.g. 'Is token 0xdAC17…ec7 on eth a scam?'"),
+  },
+  async ({ question }) => {
+    const body = { question };
+    const init = { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": UA }, body: JSON.stringify(body) } as const;
+    try {
+      if (API_KEY) {
+        const res = await fetch(`${GATEWAY}/answer`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${API_KEY}` } });
+        return asJson(await res.json().catch(() => null), !res.ok);
+      }
+      if (X402_PK) {
+        const payFetch = await getPayFetch();
+        const res = await payFetch(`${GATEWAY}/answer/x402`, init);
+        const json = (await res.json().catch(() => null)) as object | null;
+        const paid = res.headers.get("PAYMENT-RESPONSE") ? { _x402: "settled via x402" } : {};
+        return asJson({ ...(json ?? {}), ...paid }, !res.ok);
+      }
+      return asJson({ error: "The Onchain Answer Engine needs a key or x402 wallet — set NODEFLARE_API_KEY (free, https://nodeflare.app) or X402_PRIVATE_KEY. No free anonymous tier (it runs on a GPU)." }, true);
+    } catch (e) {
+      return asJson({ error: `answer failed: ${(e as Error).message}` }, true);
     }
   },
 );
