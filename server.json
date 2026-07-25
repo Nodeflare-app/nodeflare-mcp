@@ -6,13 +6,13 @@
     "url": "https://github.com/Nodeflare-app/nodeflare-mcp",
     "source": "github"
   },
-  "version": "0.5.0",
+  "version": "0.6.4",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "nodeflare-mcp",
-      "version": "0.5.0",
+      "version": "0.6.4",
       "transport": {
         "type": "stdio"
       },

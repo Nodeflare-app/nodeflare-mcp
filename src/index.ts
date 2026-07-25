@@ -26,7 +26,7 @@ const GATEWAY = "https://rpc.nodeflare.app";
 // Identify our SDK traffic. The gateway edge blocks empty / bare-"node" (undici
 // default) User-Agents on the public tier as bot noise, so we send a distinct UA
 // to stay allowed on keyless calls.
-const UA = "nodeflare-mcp/0.6.2";
+const UA = "nodeflare-mcp/0.6.4";
 
 // Mirrors https://x402.nodeflare.app/ — kept static so the server works offline-first.
 const CHAINS: Record<string, { label: string; chainId: number; currency: string }> = {
@@ -223,7 +223,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.6.0" });
+const server = new McpServer({ name: "nodeflare", version: "0.6.4" });
 
 const chainParam = z.string().describe(
   "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
