@@ -89,6 +89,8 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | `get_token_balance` | ERC-20 balance, raw + human-readable |
 | `get_token_metadata` | ERC-20 name, symbol, decimals, total supply |
 | `resolve_ens` | ENS name → address (forward) or address → primary ENS name (reverse) |
+| `get_token_price` | Current USD price of an ERC-20 (DefiLlama, keyless) — price, symbol, confidence |
+| `compare_gas` | Gas price across chains in one call, cheapest first, so an agent picks where to transact |
 | `get_multichain_balances` | Native + ERC-20 balances for one address across many of the 23 chains in one call (incl. young chains); pay-per-call with an x402 wallet |
 | `get_token_allowances` | ERC-20 approvals a wallet has granted across chains, with revoked ones dropped and unlimited approvals flagged (heavy — key or x402) |
 | `get_wallet_report` | Full "know this wallet" report: balances + USD total + top holdings + active approvals, across chains (approvals half is heavy) |

@@ -26,7 +26,7 @@ const GATEWAY = "https://rpc.nodeflare.app";
 // Identify our SDK traffic. The gateway edge blocks empty / bare-"node" (undici
 // default) User-Agents on the public tier as bot noise, so we send a distinct UA
 // to stay allowed on keyless calls.
-const UA = "nodeflare-mcp/0.7.0";
+const UA = "nodeflare-mcp/0.8.0";
 
 // Mirrors https://x402.nodeflare.app/ — kept static so the server works offline-first.
 const CHAINS: Record<string, { label: string; chainId: number; currency: string }> = {
@@ -223,7 +223,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.7.0" });
+const server = new McpServer({ name: "nodeflare", version: "0.8.0" });
 
 const chainParam = z.string().describe(
   "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
@@ -640,6 +640,52 @@ server.prompt(
       ? `Use get_gas_price for ${chain} and report the base gas price and priority fee in gwei.`
       : `Use get_gas_price across the major chains (ethereum, base, arbitrum, optimism, bnb, polygon) and present a table ranked cheapest-first in gwei, with a one-line takeaway on where a simple transfer is cheapest right now.`,
   ),
+);
+
+// ── Completeness tools ───────────────────────────────────────────────────────
+// DefiLlama chain names for the keyless USD price lookup (well-covered chains only).
+const DEFILLAMA_CHAIN: Record<string, string> = {
+  eth: "ethereum", base: "base", bnb: "bsc", arb: "arbitrum", op: "optimism",
+  avax: "avax", polygon: "polygon", linea: "linea", mantle: "mantle",
+  sonic: "sonic", unichain: "unichain", sei: "sei", cronos: "cronos",
+};
+
+server.tool(
+  "get_token_price",
+  "Current USD price of an ERC-20 token from DefiLlama (free, keyless): price + symbol + confidence, or null for unlisted/thin-market tokens. Well-covered chains only (eth, base, bnb, arb, op, avax, polygon, linea, mantle, sonic, unichain, sei, cronos).",
+  { chain: chainParam, token: z.string().describe("0x ERC-20 contract address") },
+  async ({ chain, token }) => {
+    const c = resolveChain(chain);
+    if (!c) return asJson({ error: `Unknown chain '${chain}'. Use list_chains for valid slugs.` }, true);
+    const t = token.trim().toLowerCase();
+    if (!/^0x[0-9a-f]{40}$/.test(t)) return asJson({ error: "Provide a 0x ERC-20 token address" }, true);
+    const dll = DEFILLAMA_CHAIN[c];
+    if (!dll) return asJson({ chain: c, token: t, priceUsd: null, note: "No price coverage for this chain (young/thin-market)." });
+    try {
+      const r = await fetch(`https://coins.llama.fi/prices/current/${dll}:${t}`, { signal: AbortSignal.timeout(6000) });
+      const j = (await r.json().catch(() => null)) as { coins?: Record<string, { price?: number; symbol?: string; decimals?: number; confidence?: number }> } | null;
+      const coin = j?.coins?.[`${dll}:${t}`];
+      if (!coin || typeof coin.price !== "number") return asJson({ chain: c, token: t, priceUsd: null, note: "No market price (unlisted or spam token)." });
+      return asJson({ chain: c, token: t, symbol: coin.symbol, decimals: coin.decimals, priceUsd: coin.price, confidence: coin.confidence });
+    } catch {
+      return asJson({ error: "Price lookup failed" }, true);
+    }
+  },
+);
+
+server.tool(
+  "compare_gas",
+  "Compare current gas price ACROSS chains in one call — gwei per chain, cheapest first, so an agent can pick where to transact. Defaults to the majors (eth, base, arb, op, bnb, polygon); pass chains to override.",
+  { chains: z.array(z.string()).optional().describe("Chains to compare — slug/name/ID; defaults to the majors") },
+  async ({ chains }) => {
+    const list = [...new Set((chains?.length ? chains : ["eth", "base", "arb", "op", "bnb", "polygon"]).map((c) => resolveChain(c)).filter((c): c is string => !!c))];
+    const rows = await Promise.all(list.map(async (c) => {
+      const gas = await callResult(c, "eth_gasPrice", []);
+      return { chain: c, gasPriceGwei: gas ? Number(formatUnits(BigInt(gas), 9)) : null };
+    }));
+    const ok = rows.filter((r) => r.gasPriceGwei != null).sort((a, b) => (a.gasPriceGwei as number) - (b.gasPriceGwei as number));
+    return asJson({ cheapestFirst: ok, cheapest: ok[0]?.chain ?? null, unavailable: rows.filter((r) => r.gasPriceGwei == null).map((r) => r.chain) });
+  },
 );
 
 const transport = new StdioServerTransport();
