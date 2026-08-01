@@ -1,0 +1,31 @@
+name: Publish to MCP Registry
+
+# Publishes ./server.json to the official MCP registry via GitHub Actions OIDC —
+# running inside the Nodeflare-app org grants the io.github.Nodeflare-app/*
+# namespace automatically (interactive device-flow logins only carry the personal
+# namespace unless GitHub exposes an admin org membership to the OAuth app).
+# Run MANUALLY after the npm release of the same version is live: the registry
+# validates that the npm package (and its mcpName) exists.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  mcp-registry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for registry auth
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install mcp-publisher
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher --version
+      - name: Login (GitHub Actions OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Publish server.json
+        run: ./mcp-publisher publish
