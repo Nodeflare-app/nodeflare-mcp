@@ -1,8 +1,8 @@
 {
   "name": "nodeflare-mcp",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "author": "NodeFlare <info@nodeflare.app> (https://nodeflare.app)",
-  "description": "MCP server for NodeFlare RPC — blockchain data on 23 EVM chains for AI agents. Free public tier, API key, or pay-per-call with x402 (USDC on Base/Polygon/Arbitrum).",
+  "description": "MCP server for NodeFlare RPC \u2014 blockchain data on 18 EVM chains for AI agents. Free public tier, API key, or pay-per-call with x402 (USDC on Base/Polygon/Arbitrum).",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -41,7 +41,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm test",
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

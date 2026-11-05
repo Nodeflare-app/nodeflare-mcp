@@ -3,7 +3,7 @@
 [![nodeflare-mcp MCP server](https://glama.ai/mcp/servers/Nodeflare-app/nodeflare-mcp/badges/card.svg)](https://glama.ai/mcp/servers/Nodeflare-app/nodeflare-mcp)
 
 
-Blockchain JSON-RPC for AI agents on **23 EVM chains** — Ethereum, Base, BNB Chain, Arbitrum, Optimism, Avalanche, HyperEVM, Polygon, and young chains like Robinhood Chain, Plasma, Ink, Zircuit, BOB and Soneium. Served from [NodeFlare](https://nodeflare.app)'s own bare-metal nodes across 5 regions.
+Blockchain JSON-RPC for AI agents on **18 EVM chains** — Ethereum, Base, BNB Chain, Arbitrum, Optimism, Avalanche, HyperEVM, Polygon, and young chains like Robinhood Chain, Arc, Ink, Zircuit, BOB and Soneium. NodeFlare operates primary nodes; some chains have third-party fallback providers. Method support and historical coverage vary by chain.
 
 ## Quick start
 
@@ -31,7 +31,7 @@ claude plugin marketplace add Nodeflare-app/nodeflare-mcp
 claude plugin install nodeflare
 ```
 
-Then use the recipes below (`/nodeflare:balance`, `/nodeflare:token`, …). To unlock heavy methods, export `NODEFLARE_API_KEY` in your shell before starting Claude Code ([free key, 2M CU/month](https://nodeflare.app)).
+Then use the recipes below (`/nodeflare:balance`, `/nodeflare:token`, …). To unlock heavy methods, export `NODEFLARE_API_KEY` in your shell before starting Claude Code ([free key, 3M CU/month](https://nodeflare.app)).
 
 ## Recipes
 
@@ -52,8 +52,8 @@ The server picks its access tier from the environment:
 
 | Env var | Tier |
 |---|---|
-| *(none)* | Free public endpoints — standard read methods, rate-limited per IP |
-| `NODEFLARE_API_KEY` | Free/paid key — heavy methods, 2,000,000 compute units/month free ([get one](https://nodeflare.app)) |
+| *(none)* | Free public endpoints — standard reads, one request per 10 seconds per IP |
+| `NODEFLARE_API_KEY` | Free/paid key — supported heavy methods; free tier: 3,000,000 CU/month at 10 requests/second ([get one](https://nodeflare.app)) |
 | `X402_PRIVATE_KEY` | **Pay per call with [x402](https://nodeflare.app/x402)** — heavy methods (`eth_getLogs`, `trace_*`, `debug_*`) are paid from this wallet in USDC on Base, Polygon or Arbitrum, ~$0.001/call. No account needed; gas is covered by the facilitator. |
 
 With an x402 wallet, a blocked heavy method is retried automatically as a paid call — the tool result includes `"_x402": "settled via x402"` when a payment settled on-chain.
@@ -76,7 +76,7 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 
 | Tool | Description |
 |---|---|
-| `list_chains` | The 23 supported chains with chain IDs and endpoints |
+| `list_chains` | The 18 supported chains with chain IDs and endpoints |
 | `get_block_number` | Latest block number (decimal + hex) |
 | `get_balance` | Native-token balance — raw wei + human-readable amount in the chain's currency |
 | `get_transaction_receipt` | Transaction receipt by hash |
@@ -91,7 +91,7 @@ With an x402 wallet, a blocked heavy method is retried automatically as a paid c
 | `resolve_ens` | ENS name → address (forward) or address → primary ENS name (reverse) |
 | `get_token_price` | Current USD price of an ERC-20 (DefiLlama, keyless) — price, symbol, confidence |
 | `compare_gas` | Gas price across chains in one call, cheapest first, so an agent picks where to transact |
-| `get_multichain_balances` | Native + ERC-20 balances for one address across many of the 23 chains in one call (incl. young chains); pay-per-call with an x402 wallet |
+| `get_multichain_balances` | Native + ERC-20 balances for one address across many of the 18 chains in one call (incl. young chains); pay-per-call with an x402 wallet |
 | `get_token_allowances` | ERC-20 approvals a wallet has granted across chains, with revoked ones dropped and unlimited approvals flagged (heavy — key or x402) |
 | `get_wallet_report` | Full "know this wallet" report: balances + USD total + top holdings + active approvals, across chains (approvals half is heavy) |
 | `check_token_safety` | Risk-check an ERC-20 before trading: ownership, proxy detection, holder concentration, honeypot simulation → risk score (deep checks heavy) |
@@ -108,7 +108,7 @@ The server also exposes the recipes as **MCP prompts**, so guided workflows show
 
 ## Links
 
-- [NodeFlare](https://nodeflare.app) — free API key, 2M CU/month
+- [NodeFlare](https://nodeflare.app) — free API key, 3M CU/month
 - [x402 pay-per-request](https://nodeflare.app/x402) — pricing and how it works
 - [Docs](https://nodeflare.app/docs) · [Status](https://nodeflare.app/status) · [Discord](https://discord.gg/ameHnRy2D6)
 

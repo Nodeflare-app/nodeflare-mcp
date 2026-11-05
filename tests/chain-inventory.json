@@ -1,0 +1,74 @@
+{
+  "eth": {
+    "chainId": 1,
+    "currency": "ETH"
+  },
+  "base": {
+    "chainId": 8453,
+    "currency": "ETH"
+  },
+  "bnb": {
+    "chainId": 56,
+    "currency": "BNB"
+  },
+  "arb": {
+    "chainId": 42161,
+    "currency": "ETH"
+  },
+  "op": {
+    "chainId": 10,
+    "currency": "ETH"
+  },
+  "hl": {
+    "chainId": 999,
+    "currency": "HYPE"
+  },
+  "avax": {
+    "chainId": 43114,
+    "currency": "AVAX"
+  },
+  "unichain": {
+    "chainId": 130,
+    "currency": "ETH"
+  },
+  "sonic": {
+    "chainId": 146,
+    "currency": "S"
+  },
+  "polygon": {
+    "chainId": 137,
+    "currency": "POL"
+  },
+  "zircuit": {
+    "chainId": 48900,
+    "currency": "ETH"
+  },
+  "robinhood": {
+    "chainId": 4663,
+    "currency": "ETH"
+  },
+  "xlayer": {
+    "chainId": 196,
+    "currency": "OKB"
+  },
+  "soneium": {
+    "chainId": 1868,
+    "currency": "ETH"
+  },
+  "bob": {
+    "chainId": 60808,
+    "currency": "ETH"
+  },
+  "ink": {
+    "chainId": 57073,
+    "currency": "ETH"
+  },
+  "mode": {
+    "chainId": 34443,
+    "currency": "ETH"
+  },
+  "arc": {
+    "chainId": 5042,
+    "currency": "USDC"
+  }
+}

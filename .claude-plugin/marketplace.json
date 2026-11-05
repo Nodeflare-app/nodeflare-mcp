@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "nodeflare",
   "version": "0.3.0",
-  "description": "NodeFlare RPC tools for Claude Code — read on-chain data across 23 EVM chains from a free public gateway.",
+  "description": "NodeFlare RPC tools for Claude Code — read on-chain data across 18 EVM chains from a free public gateway.",
   "owner": {
     "name": "NodeFlare",
     "email": "info@nodeflare.app",
@@ -12,7 +12,7 @@
     {
       "name": "nodeflare",
       "displayName": "NodeFlare RPC",
-      "description": "Read on-chain data across 23 EVM chains via NodeFlare's public RPC gateway — balances, tokens, transactions, logs and gas. Bundles the nodeflare MCP server plus ready-made slash-command recipes.",
+      "description": "Read on-chain data across 18 EVM chains via NodeFlare's public RPC gateway — balances, tokens, transactions, logs and gas. Bundles the nodeflare MCP server plus ready-made slash-command recipes.",
       "version": "0.3.0",
       "author": {
         "name": "NodeFlare",

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// NodeFlare MCP server — blockchain JSON-RPC on 23 EVM chains for AI agents.
+// NodeFlare MCP server — blockchain JSON-RPC on supported EVM chains for AI agents.
 //
 // Access tiers, picked automatically from the environment:
 //   (none)                → free public endpoints (standard read methods)
@@ -26,63 +26,9 @@ const GATEWAY = "https://rpc.nodeflare.app";
 // Identify our SDK traffic. The gateway edge blocks empty / bare-"node" (undici
 // default) User-Agents on the public tier as bot noise, so we send a distinct UA
 // to stay allowed on keyless calls.
-const UA = "nodeflare-mcp/0.8.0";
+const UA = "nodeflare-mcp/0.8.1";
 
-// Mirrors https://x402.nodeflare.app/ — kept static so the server works offline-first.
-const CHAINS: Record<string, { label: string; chainId: number; currency: string }> = {
-  eth: { label: "Ethereum", chainId: 1, currency: "ETH" },
-  base: { label: "Base", chainId: 8453, currency: "ETH" },
-  bnb: { label: "BNB Chain", chainId: 56, currency: "BNB" },
-  arb: { label: "Arbitrum One", chainId: 42161, currency: "ETH" },
-  op: { label: "Optimism", chainId: 10, currency: "ETH" },
-  hl: { label: "HyperEVM (HyperLiquid)", chainId: 999, currency: "HYPE" },
-  avax: { label: "Avalanche C-Chain", chainId: 43114, currency: "AVAX" },
-  unichain: { label: "Unichain", chainId: 130, currency: "ETH" },
-  sonic: { label: "Sonic", chainId: 146, currency: "S" },
-  polygon: { label: "Polygon PoS", chainId: 137, currency: "POL" },
-  linea: { label: "Linea", chainId: 59144, currency: "ETH" },
-  mantle: { label: "Mantle", chainId: 5000, currency: "MNT" },
-  zircuit: { label: "Zircuit", chainId: 48900, currency: "ETH" },
-  robinhood: { label: "Robinhood Chain", chainId: 4663, currency: "ETH" },
-  xlayer: { label: "XLayer", chainId: 196, currency: "OKB" },
-  soneium: { label: "Soneium", chainId: 1868, currency: "ETH" },
-  nova: { label: "Arbitrum Nova", chainId: 42170, currency: "ETH" },
-  bob: { label: "BOB", chainId: 60808, currency: "ETH" },
-  ink: { label: "Ink", chainId: 57073, currency: "ETH" },
-  cronos: { label: "Cronos", chainId: 25, currency: "CRO" },
-  mode: { label: "Mode", chainId: 34443, currency: "ETH" },
-  sei: { label: "Sei", chainId: 1329, currency: "SEI" },
-  plasma: { label: "Plasma", chainId: 9745, currency: "XPL" },
-};
-
-// Common alternate names agents/humans use → canonical slug. The slug itself and
-// the numeric chain ID are always accepted too (handled in resolveChain).
-const ALIASES: Record<string, string> = {
-  ethereum: "eth", mainnet: "eth", "eth-mainnet": "eth",
-  arbitrum: "arb", "arbitrum-one": "arb", arbitrumone: "arb",
-  "arbitrum-nova": "nova", arbitrumnova: "nova",
-  optimism: "op", "op-mainnet": "op",
-  bsc: "bnb", binance: "bnb", "bnb-chain": "bnb", "binance-smart-chain": "bnb",
-  avalanche: "avax", "avalanche-c-chain": "avax",
-  matic: "polygon", "polygon-pos": "polygon", pol: "polygon",
-  hyperevm: "hl", hyperliquid: "hl", hype: "hl",
-  "x-layer": "xlayer", okx: "xlayer",
-};
-
-// Accept a chain slug, a common name/alias, or a numeric chain ID and return the
-// canonical slug (or null if unknown). Removes the "ethereum vs eth vs 1" friction.
-const BY_CHAIN_ID: Record<number, string> = Object.fromEntries(
-  Object.entries(CHAINS).map(([slug, c]) => [c.chainId, slug]),
-);
-function resolveChain(input: string): string | null {
-  const s = String(input).trim().toLowerCase();
-  if (CHAINS[s]) return s;
-  if (ALIASES[s]) return ALIASES[s];
-  // numeric or hex chain ID
-  const n = s.startsWith("0x") ? parseInt(s, 16) : /^\d+$/.test(s) ? parseInt(s, 10) : NaN;
-  if (!Number.isNaN(n) && BY_CHAIN_ID[n]) return BY_CHAIN_ID[n];
-  return null;
-}
+import { CHAINS, resolveChain } from "./chains.js";
 
 const API_KEY = process.env.NODEFLARE_API_KEY;
 const X402_PK = process.env.X402_PRIVATE_KEY;
@@ -172,7 +118,7 @@ async function rpc(chainInput: string, method: string, params: unknown[]): Promi
       body: {
         error: `${method} is not available on the free public tier.`,
         options: [
-          "Set NODEFLARE_API_KEY (free key, 2M compute units/month: https://nodeflare.app)",
+          "Set NODEFLARE_API_KEY (free key, 3M compute units/month: https://nodeflare.app)",
           "Set X402_PRIVATE_KEY (wallet with USDC on Base/Polygon/Arbitrum) to pay ~$0.001 per call via x402",
         ],
       },
@@ -223,7 +169,7 @@ async function ethCallBatch(chainInput: string, calls: { to: string; data: strin
   }
 }
 
-const server = new McpServer({ name: "nodeflare", version: "0.8.0" });
+const server = new McpServer({ name: "nodeflare", version: "0.8.1" });
 
 const chainParam = z.string().describe(
   "Chain to query. Accepts a slug (eth, base, arb, op, robinhood…), a common name (ethereum, arbitrum, optimism, bsc), or a numeric chain ID (1, 8453). Call list_chains for all valid values.",
@@ -231,7 +177,7 @@ const chainParam = z.string().describe(
 
 server.tool(
   "list_chains",
-  "List the 23 EVM chains NodeFlare serves, with chain IDs and endpoint URLs.",
+  "List the supported EVM chains NodeFlare serves, with chain IDs and endpoint URLs.",
   {},
   async () => ({
     content: [{
@@ -428,12 +374,12 @@ server.tool(
 
 server.tool(
   "get_multichain_balances",
-  "Get native + ERC-20 token balances for one address across many of the 23 EVM chains in a SINGLE call — including young chains (Robinhood, Plasma, Ink) that Alchemy/Moralis omit. With an x402 wallet (X402_PRIVATE_KEY) this is paid per request (~$0.0003/chain); otherwise it uses the free public tier.",
+  "Get native + ERC-20 token balances for one address across many of the supported EVM chains in a SINGLE call. With an x402 wallet (X402_PRIVATE_KEY) this is paid per request (~$0.0003/chain); otherwise it uses the free public tier.",
   {
     address: z.string().describe("0x-address to look up"),
-    chains: z.array(z.string()).optional().describe("Chains to include — slug, name, or chain ID; defaults to all 23"),
+    chains: z.array(z.string()).optional().describe("Chains to include — slug, name, or chain ID; defaults to the service defaults"),
     tokens: z.record(z.string(), z.array(z.string())).optional().describe("ERC-20 contract addresses per chain, e.g. { base: ['0x833589…'] }"),
-    discover: z.boolean().optional().describe("Auto-discover the ERC-20 tokens the address holds via Transfer logs. Needs an x402 wallet (heavy method). Comprehensive on young chains; large chains cap the scan — narrow with fromBlock."),
+    discover: z.boolean().optional().describe("Auto-discover the ERC-20 tokens the address holds via Transfer logs. Needs an x402 wallet (heavy method). Discovery is bounded and may miss holdings; narrow with fromBlock."),
     fromBlock: z.string().optional().describe("Start block for discovery (hex or 'earliest'); narrow the window on high-history chains"),
     minUsd: z.number().optional().describe("Discovery only: drop discovered tokens worth less than this USD value on price-covered chains (default 0.01, filters near-worthless spam). Set 0 to keep any priced token."),
     includeSpam: z.boolean().optional().describe("Discovery only: keep tokens with no DefiLlama price (likely spam/airdrops) on price-covered chains. Default false."),
@@ -475,7 +421,7 @@ server.tool(
 // remote MCP, the local server CAN authenticate, so the heavy path actually
 // runs here: keyed (NODEFLARE_API_KEY → Bearer) or paid (X402_PRIVATE_KEY →
 // x402), falling back to the light public result. Same young-chain coverage
-// (Robinhood, Plasma, Ink, Zircuit) that big indexers leave empty.
+// depends on the supported chain and method; results may be partial.
 async function callData(name: string, body: Record<string, unknown>) {
   const init = { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": UA }, body: JSON.stringify(body) } as const;
   try {
@@ -499,27 +445,27 @@ async function callData(name: string, body: Record<string, unknown>) {
 
 server.tool(
   "get_token_allowances",
-  "ERC-20 approvals a wallet has granted (what it approved and for how much) across many of the 23 EVM chains in ONE call — including young chains (Robinhood, Plasma, Ink) that revoke.cash-style tools skip. Scans Approval logs, reads the live allowance, drops revoked ones, flags unlimited approvals. Heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY.",
+  "ERC-20 approvals a wallet has granted (what it approved and for how much) across many of the supported EVM chains in ONE call. Scans Approval logs, reads the live allowance, drops revoked ones, flags unlimited approvals. Heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY.",
   {
     address: z.string().describe("0x owner/approver address to look up"),
-    chains: z.array(z.string()).optional().describe("Chains to include — slug/name/ID; defaults to all 23"),
+    chains: z.array(z.string()).optional().describe("Chains to include — slug/name/ID; defaults to the service defaults"),
   },
   async ({ address, chains }) => callData("allowances", { address, ...(chains ? { chains } : {}) }),
 );
 
 server.tool(
   "get_wallet_report",
-  "The full agent-ready 'know this wallet' report in ONE call: native + ERC-20 balances (USD-priced), a rolled-up total + top holdings, AND the active token approvals (revoke risk) across many of the 23 EVM chains — including young chains big indexers skip. The approvals half is heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (balances/USD come back either way).",
+  "The full agent-ready 'know this wallet' report in ONE call: native + ERC-20 balances (USD-priced), a rolled-up total + top holdings, AND the active token approvals (revoke risk) across many of the supported EVM chains. The approvals half is heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (balances/USD come back either way).",
   {
     address: z.string().describe("0x-address to report on"),
-    chains: z.array(z.string()).optional().describe("Chains to include — slug/name/ID; defaults to all 23"),
+    chains: z.array(z.string()).optional().describe("Chains to include — slug/name/ID; defaults to the service defaults"),
   },
   async ({ address, chains }) => callData("wallet-report", { address, ...(chains ? { chains } : {}) }),
 );
 
 server.tool(
   "check_token_safety",
-  "Risk-check an ERC-20 before trading it: metadata, contract + ownership status, upgradeable-proxy detection, holder concentration, and a transfer/honeypot simulation → risk signals + a score. The deep checks (concentration, honeypot) are heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY. Works on young chains (Zircuit, Robinhood, Plasma, Ink) that big indexers leave empty.",
+  "Risk-check an ERC-20 before trading it: metadata, contract + ownership status, upgradeable-proxy detection, holder concentration, and a transfer/honeypot simulation → risk signals + a score. The deep checks (concentration, honeypot) are heavy: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY. Method support and historical coverage vary by chain; risk signals are not a safety guarantee.",
   {
     chain: z.string().describe("Chain — slug (eth, base, robinhood…), name, or chain ID"),
     token: z.string().describe("0x ERC-20 contract address to check"),
@@ -542,7 +488,7 @@ server.tool(
 
 server.tool(
   "onchain_answer",
-  "Onchain Answer Engine: ask a plain-English question about any wallet or token across the 23 EVM chains and get back a CITED verdict in one call — 'is token 0x… on <chain> a scam?', 'what does wallet 0x… hold?'. NodeFlare plans the on-chain lookups, runs them on its own nodes, and synthesizes a sourced answer. Paid: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (no free anonymous tier — it runs on a GPU).",
+  "Onchain Answer Engine: ask a plain-English question about any wallet or token across the supported EVM chains and get back a CITED verdict in one call — 'is token 0x… on <chain> a scam?', 'what does wallet 0x… hold?'. NodeFlare plans the on-chain lookups, runs them on its own nodes, and synthesizes a sourced answer. Paid: needs NODEFLARE_API_KEY or X402_PRIVATE_KEY (no free anonymous tier — it runs on a GPU).",
   {
     question: z.string().describe("Natural-language question about a wallet or token, e.g. 'Is token 0xdAC17…ec7 on eth a scam?'"),
   },
@@ -646,13 +592,13 @@ server.prompt(
 // DefiLlama chain names for the keyless USD price lookup (well-covered chains only).
 const DEFILLAMA_CHAIN: Record<string, string> = {
   eth: "ethereum", base: "base", bnb: "bsc", arb: "arbitrum", op: "optimism",
-  avax: "avax", polygon: "polygon", linea: "linea", mantle: "mantle",
-  sonic: "sonic", unichain: "unichain", sei: "sei", cronos: "cronos",
+  avax: "avax", polygon: "polygon",
+  sonic: "sonic", unichain: "unichain",
 };
 
 server.tool(
   "get_token_price",
-  "Current USD price of an ERC-20 token from DefiLlama (free, keyless): price + symbol + confidence, or null for unlisted/thin-market tokens. Well-covered chains only (eth, base, bnb, arb, op, avax, polygon, linea, mantle, sonic, unichain, sei, cronos).",
+  "Current USD price of an ERC-20 token from DefiLlama (free, keyless): price + symbol + confidence, or null for unlisted/thin-market tokens. Well-covered chains only (eth, base, bnb, arb, op, avax, polygon, sonic, unichain).",
   { chain: chainParam, token: z.string().describe("0x ERC-20 contract address") },
   async ({ chain, token }) => {
     const c = resolveChain(chain);
